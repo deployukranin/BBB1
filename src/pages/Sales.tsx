@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Modal } from '../components/common/Modal';
 import { Sale } from '../types';
@@ -10,18 +10,26 @@ import {
   Eye,
   CreditCard,
   DollarSign,
-  QrCode
+  QrCode,
+  Trash2,
+  RefreshCw
 } from 'lucide-react';
 
 type DateFilter = 'today' | 'yesterday' | '7days' | '30days' | 'custom';
 
 export const Sales: React.FC = () => {
-  const { sales, setReceiptToPrint } = useApp();
+  const { sales, refreshSales, clearSales, setReceiptToPrint } = useApp();
 
   const [dateFilter, setDateFilter] = useState<DateFilter>('today');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const [search, setSearch] = useState('');
+  const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
+
+  // Sincroniza sempre ao entrar na tela de Vendas
+  useEffect(() => {
+    refreshSales();
+  }, [refreshSales]);
 
   // Detalhes da venda selecionada
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
@@ -157,16 +165,44 @@ export const Sales: React.FC = () => {
           </button>
         </div>
 
-        {/* Busca por Texto */}
-        <div className="search-input-wrap" style={{ minWidth: 260 }}>
-          <Search size={18} />
-          <input
-            type="text"
-            className="form-input"
-            placeholder="Buscar por nº, atendente..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
+        {/* Busca por Texto e Ação de Limpar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div className="search-input-wrap" style={{ minWidth: 240 }}>
+            <Search size={18} />
+            <input
+              type="text"
+              className="form-input"
+              placeholder="Buscar por nº, atendente..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+
+          <button
+            className="btn btn-secondary"
+            onClick={() => refreshSales()}
+            title="Atualizar lista com Supabase"
+            style={{ padding: '8px 12px' }}
+          >
+            <RefreshCw size={16} />
+          </button>
+
+          {sales.length > 0 && (
+            <button
+              className="btn btn-secondary"
+              onClick={() => setIsConfirmClearOpen(true)}
+              style={{
+                padding: '8px 14px',
+                fontSize: '0.85rem',
+                color: 'var(--danger-text)',
+                borderColor: 'var(--danger-border)'
+              }}
+              title="Limpar histórico de vendas"
+            >
+              <Trash2 size={16} />
+              <span>Limpar Vendas</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -451,6 +487,39 @@ export const Sales: React.FC = () => {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* MODAL DE CONFIRMAÇÃO DE LIMPEZA DE VENDAS */}
+      <Modal
+        isOpen={isConfirmClearOpen}
+        onClose={() => setIsConfirmClearOpen(false)}
+        title="Limpar Histórico de Vendas"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <p style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            Tem certeza que deseja apagar todas as <strong>{sales.length}</strong> vendas registradas?
+            Esta ação limpará o histórico no banco de dados e atualizará o painel de início automaticamente.
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 8 }}>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setIsConfirmClearOpen(false)}
+            >
+              Cancelar
+            </button>
+            <button
+              className="btn btn-primary"
+              style={{ background: 'var(--danger-text)', borderColor: 'var(--danger-text)' }}
+              onClick={() => {
+                clearSales();
+                setIsConfirmClearOpen(false);
+              }}
+            >
+              <Trash2 size={16} />
+              <span>Sim, Limpar Todas as Vendas</span>
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

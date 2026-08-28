@@ -186,13 +186,13 @@ export const supabaseService = {
       }
 
       return {
-        companyName: data.company_name,
-        logoUrl: data.logo_url || undefined,
+        companyName: data.store_name || data.company_name || INITIAL_SETTINGS.companyName,
+        logoUrl: data.logo || data.logo_url || undefined,
         phone: data.phone || '',
-        whatsapp: data.whatsapp || '',
-        instagram: data.instagram || '',
+        whatsapp: data.pix_key || data.whatsapp || '',
+        instagram: data.pix_beneficiary || data.instagram || '',
         address: data.address || '',
-        receiptHeader: data.receipt_header || '',
+        receiptHeader: data.trade_name || data.receipt_header || data.store_name || '',
         receiptFooter: data.receipt_footer || '',
         printerWidth: (data.printer_width as '58mm' | '80mm') || '58mm',
         lowStockThreshold: Number(data.low_stock_threshold || 3),
@@ -209,16 +209,14 @@ export const supabaseService = {
     try {
       await supabase.from('settings').upsert({
         id: 'default',
-        company_name: s.companyName,
-        logo_url: s.logoUrl || null,
+        store_name: s.companyName,
+        trade_name: s.receiptHeader || s.companyName,
         phone: s.phone,
-        whatsapp: s.whatsapp,
-        instagram: s.instagram,
         address: s.address,
-        receipt_header: s.receiptHeader,
+        logo: s.logoUrl || null,
+        pix_key: s.whatsapp,
+        pix_beneficiary: s.instagram,
         receipt_footer: s.receiptFooter,
-        printer_width: s.printerWidth,
-        low_stock_threshold: s.lowStockThreshold,
         theme: s.theme,
         updated_at: new Date().toISOString()
       });
@@ -308,6 +306,15 @@ export const supabaseService = {
     }
   },
 
+  async clearAllSales(): Promise<void> {
+    if (!isSupabaseConfigured) return;
+    try {
+      await supabase.from('sales').delete().neq('id', 'none');
+    } catch (err) {
+      console.warn('Error clearing sales from Supabase:', err);
+    }
+  },
+
   // 5. CASH SESSIONS
   async fetchCashSessions(): Promise<CashSession[] | null> {
     if (!isSupabaseConfigured) return null;
@@ -325,15 +332,15 @@ export const supabaseService = {
         openedAt: cs.opened_at,
         closedAt: cs.closed_at || undefined,
         status: cs.status,
-        initialBalance: Number(cs.initial_balance || 0),
+        initialBalance: Number(cs.opening_balance ?? cs.initial_balance ?? 0),
         totalSales: Number(cs.total_sales || 0),
         totalIn: Number(cs.total_in || 0),
         totalOut: Number(cs.total_out || 0),
-        expectedBalance: Number(cs.expected_balance || 0),
-        countedBalance: cs.counted_balance !== null ? Number(cs.counted_balance) : undefined,
-        difference: cs.difference !== null ? Number(cs.difference) : undefined,
-        openedByUserId: cs.opened_by_user_id,
-        openedByUserName: cs.opened_by_user_name,
+        expectedBalance: Number(cs.closing_balance ?? cs.opening_balance ?? cs.initial_balance ?? 0),
+        countedBalance: cs.closing_balance !== null && cs.closing_balance !== undefined ? Number(cs.closing_balance) : undefined,
+        difference: cs.difference !== null && cs.difference !== undefined ? Number(cs.difference) : undefined,
+        openedByUserId: cs.user_id || cs.opened_by_user_id,
+        openedByUserName: cs.user_name || cs.opened_by_user_name,
         closedByUserId: cs.closed_by_user_id || undefined,
         closedByUserName: cs.closed_by_user_name || undefined,
         notes: cs.notes || undefined
@@ -352,17 +359,10 @@ export const supabaseService = {
         opened_at: cs.openedAt,
         closed_at: cs.closedAt || null,
         status: cs.status,
-        initial_balance: cs.initialBalance,
-        total_sales: cs.totalSales,
-        total_in: cs.totalIn,
-        total_out: cs.totalOut,
-        expected_balance: cs.expectedBalance,
-        counted_balance: cs.countedBalance !== undefined ? cs.countedBalance : null,
-        difference: cs.difference !== undefined ? cs.difference : null,
-        opened_by_user_id: cs.openedByUserId,
-        opened_by_user_name: cs.openedByUserName,
-        closed_by_user_id: cs.closedByUserId || null,
-        closed_by_user_name: cs.closedByUserName || null,
+        opening_balance: cs.initialBalance,
+        closing_balance: cs.countedBalance ?? cs.expectedBalance ?? null,
+        user_id: cs.openedByUserId || 'usr_admin',
+        user_name: cs.openedByUserName || 'Admin',
         notes: cs.notes || null
       });
     } catch (err) {
@@ -404,13 +404,13 @@ export const supabaseService = {
     try {
       await supabase.from('cash_transactions').upsert({
         id: tx.id,
-        session_id: tx.sessionId,
+        session_id: tx.sessionId || null,
         type: tx.type,
         amount: tx.amount,
         reason: tx.reason,
         sale_id: tx.saleId || null,
-        user_id: tx.userId,
-        user_name: tx.userName,
+        user_id: tx.userId || 'usr_admin',
+        user_name: tx.userName || 'Admin',
         created_at: tx.createdAt
       });
     } catch (err) {

@@ -37,6 +37,8 @@ interface AppContextType {
 
   // Sales
   sales: Sale[];
+  refreshSales: () => void;
+  clearSales: () => void;
   finalizeCurrentSale: (options: {
     paymentMethod: PaymentMethod;
     amountReceived?: number;
@@ -353,6 +355,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return result;
   };
 
+  const refreshSales = useCallback(async () => {
+    const local = db.getSales();
+    setSales(local);
+    const remote = await supabaseService.fetchSales();
+    if (remote) {
+      storage.set('sales', remote);
+      setSales(remote);
+    }
+  }, []);
+
+  const clearSales = () => {
+    db.clearSales();
+    setSales([]);
+    addToast('info', 'Histórico de vendas limpo com sucesso.');
+  };
+
   // Stock adjustments
   const adjustStock = (productId: string, qty: number, reason: string): boolean => {
     const res = db.adjustStock(productId, qty, reason, user || undefined);
@@ -444,6 +462,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         cartTotal,
         cartItemCount,
         sales,
+        refreshSales,
+        clearSales,
         finalizeCurrentSale,
         receiptToPrint,
         setReceiptToPrint,

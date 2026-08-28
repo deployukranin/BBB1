@@ -18,9 +18,10 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const { sales, products, activeCashSession, settings } = useApp();
 
-  // Cálculo de vendas de hoje
-  const todayStr = new Date().toISOString().split('T')[0];
-  const todaySales = sales.filter(s => s.createdAt.startsWith(todayStr));
+  // Cálculo de vendas de hoje usando a data local do dispositivo
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todaySales = sales.filter(s => new Date(s.createdAt) >= todayStart);
 
   const totalVendasHoje = todaySales.reduce((acc, s) => acc + s.total, 0);
   const totalProdutosVendidosHoje = todaySales.reduce(
@@ -37,14 +38,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
   // Vendas dos últimos 7 dias para gráfico simples
   const last7Days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (6 - i));
-    const dStr = d.toISOString().split('T')[0];
-    const daySales = sales.filter(s => s.createdAt.startsWith(dStr));
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (6 - i));
+    const nextD = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (5 - i));
+    const daySales = sales.filter(s => {
+      const sDate = new Date(s.createdAt);
+      return sDate >= d && sDate < nextD;
+    });
     const sum = daySales.reduce((acc, s) => acc + s.total, 0);
     return {
       dayName: d.toLocaleDateString('pt-BR', { weekday: 'short' }),
-      date: dStr,
+      date: d.toISOString().split('T')[0],
       total: sum
     };
   });

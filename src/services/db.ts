@@ -404,6 +404,11 @@ export const db = {
     return { success: true, sale: newSale };
   },
 
+  clearSales(): void {
+    storage.set('sales', []);
+    supabaseService.clearAllSales();
+  },
+
   // --- RESET & SEED DATA ---
   resetToDefaults(): void {
     storage.clearAll();

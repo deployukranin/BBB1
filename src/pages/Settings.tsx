@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import { Settings as SettingsType } from '../types';
@@ -20,6 +20,11 @@ export const Settings: React.FC = () => {
 
   const [form, setForm] = useState<SettingsType>({ ...settings });
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
+
+  // Sincroniza o formulário sempre que as configurações do Supabase/Contexto carregarem
+  useEffect(() => {
+    setForm({ ...settings });
+  }, [settings]);
 
   const handleChange = (field: keyof SettingsType, val: any) => {
     setForm(prev => ({ ...prev, [field]: val }));
