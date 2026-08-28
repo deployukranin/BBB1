@@ -269,31 +269,76 @@ export const Settings: React.FC = () => {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Largura da Bobina Térmica</label>
-            <select
-              className="form-select"
-              value={form.printerWidth}
-              onChange={e => handleChange('printerWidth', e.target.value as '58mm' | '80mm')}
-            >
-              <option value="58mm">58mm (Padrão Pequeno / Portátil)</option>
-              <option value="80mm">80mm (Padrão Grande / Balcão)</option>
-            </select>
-          </div>
-
-          <div className="form-group">
             <label className="form-label">Modo de Emissão</label>
             <select
               className="form-select"
               value={form.printMode || 'qz'}
               onChange={e => handleChange('printMode', e.target.value as 'qz' | 'browser')}
             >
-              <option value="qz">⚡ Direto / Silencioso via QZ Tray (Sem Diálogo do Windows)</option>
+              <option value="qz">⚡ Direto / Silencioso via QZ Tray (Recomendado)</option>
               <option value="browser">🖨️ Diálogo Padrão do Navegador (Manual)</option>
             </select>
           </div>
 
           <div className="form-group">
-            <label className="form-label">Nome da Impressora Térmica no Windows (Opcional)</label>
+            <label className="form-label">Motor de Impressão QZ Tray</label>
+            <select
+              className="form-select"
+              value={form.printEngine || 'raw'}
+              onChange={e => handleChange('printEngine', e.target.value as 'raw' | 'html')}
+            >
+              <option value="raw">⚡ RAW ESC/POS Nativo (Sem quebras gigantes / Muito Rápido)</option>
+              <option value="html">📄 Gráfico / HTML Compacto</option>
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Tamanho Padrão da Bobina</label>
+            <select
+              className="form-select"
+              value={form.printerWidth}
+              onChange={e => {
+                const val = e.target.value as '58mm' | '80mm';
+                handleChange('printerWidth', val);
+                handleChange('customWidthMm', val === '80mm' ? 72 : 48);
+              }}
+            >
+              <option value="58mm">58mm (Mini Impressora / Portátil)</option>
+              <option value="80mm">80mm (Padrão Grande / Balcão)</option>
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Largura Efetiva de Impressão (mm)</label>
+            <input
+              type="number"
+              className="form-input"
+              value={form.customWidthMm || (form.printerWidth === '80mm' ? 72 : 48)}
+              onChange={e => handleChange('customWidthMm', Number(e.target.value) || 48)}
+              placeholder="Ex: 48 para 58mm, 72 para 80mm"
+              min="30"
+              max="100"
+            />
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+              Área útil em milímetros (48mm impede que a impressora estique o cupom).
+            </span>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Tamanho da Fonte no Cupom (px)</label>
+            <input
+              type="number"
+              className="form-input"
+              value={form.fontSizePx || 10}
+              onChange={e => handleChange('fontSizePx', Number(e.target.value) || 10)}
+              min="8"
+              max="18"
+              placeholder="Padrão: 10px"
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Nome da Impressora no Windows (Opcional)</label>
             <input
               type="text"
               className="form-input"
@@ -301,9 +346,20 @@ export const Settings: React.FC = () => {
               onChange={e => handleChange('printerName', e.target.value)}
               placeholder="Ex: POS-58, TM-T20, Elgin i9 (ou vazio para padrão)"
             />
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-              Se deixar em branco, usará automaticamente a impressora padrão do Windows.
-            </span>
+          </div>
+
+          <div className="form-group" style={{ display: 'flex', alignItems: 'center', paddingTop: 24 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={form.cutPaper !== false}
+                onChange={e => handleChange('cutPaper', e.target.checked)}
+                style={{ width: 18, height: 18, accentColor: 'var(--primary)' }}
+              />
+              <span style={{ fontSize: '0.92rem', fontWeight: 600 }}>
+                Acionar guilhotina (Corte automático de papel)
+              </span>
+            </label>
           </div>
 
           <div className="form-group" style={{ gridColumn: '1 / -1' }}>

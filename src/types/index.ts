@@ -122,6 +122,11 @@ export interface Settings {
   receiptHeader: string;
   receiptFooter: string;
   printerWidth: '58mm' | '80mm';
+  customWidthMm?: number; // Largura customizada em mm (ex: 48, 58, 72, 80)
+  fontSizePx?: number; // Tamanho da fonte em pixels (ex: 10, 11, 12, 14)
+  printerDensity?: number; // DPI da impressora (ex: 203 DPI para 58mm/80mm)
+  printEngine?: 'html' | 'raw'; // Renderização HTML ou Comandos Diretos RAW ESC/POS
+  cutPaper?: boolean; // Acionar corte automático do papel
   printerName?: string;
   printMode?: 'qz' | 'browser';
   lowStockThreshold: number;
