@@ -122,6 +122,8 @@ export interface Settings {
   receiptHeader: string;
   receiptFooter: string;
   printerWidth: '58mm' | '80mm';
+  printerName?: string;
+  printMode?: 'qz' | 'browser';
   lowStockThreshold: number;
   theme: 'light' | 'dark' | 'system';
 }

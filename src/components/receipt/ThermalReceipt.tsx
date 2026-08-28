@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Sale } from '../../types';
 import { useApp } from '../../context/AppContext';
-import { Printer, X } from 'lucide-react';
+import { qzPrinterService } from '../../services/qzPrinterService';
+import { Printer, X, Loader2, Zap } from 'lucide-react';
 
 interface ThermalReceiptProps {
   sale: Sale | null;
@@ -9,15 +10,42 @@ interface ThermalReceiptProps {
 }
 
 export const ThermalReceipt: React.FC<ThermalReceiptProps> = ({ sale, onClose }) => {
-  const { settings } = useApp();
+  const { settings, addToast } = useApp();
+  const [isPrinting, setIsPrinting] = useState(false);
 
   if (!sale) return null;
 
   const widthClass = settings.printerWidth === '80mm' ? 'receipt-80mm' : 'receipt-58mm';
   const saleDate = new Date(sale.createdAt);
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    // Se o usuário optou expressamente pelo modo navegador
+    if (settings.printMode === 'browser') {
+      window.print();
+      return;
+    }
+
+    setIsPrinting(true);
+    addToast('info', 'Enviando cupom...', 'Conectando ao QZ Tray para impressão silenciosa.');
+
+    const result = await qzPrinterService.printReceipt(sale, settings);
+    setIsPrinting(false);
+
+    if (result.success) {
+      addToast('success', 'Cupom impresso!', 'Impresso com sucesso na impressora térmica.');
+      if (onClose) onClose();
+    } else {
+      // Alerta amigável e fallback opcional
+      addToast(
+        'warning',
+        'QZ Tray indisponível',
+        result.error || 'Inicie o QZ Tray no seu computador. Abrindo impressão do navegador...'
+      );
+      // Fallback para não travar a venda
+      setTimeout(() => {
+        window.print();
+      }, 600);
+    }
   };
 
   const formatMoney = (val: number) => {
@@ -26,14 +54,24 @@ export const ThermalReceipt: React.FC<ThermalReceiptProps> = ({ sale, onClose })
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
         <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-          Formato: <strong>{settings.printerWidth || '58mm'}</strong> (Térmica)
+          Formato: <strong>{settings.printerWidth || '58mm'}</strong> • Modo:{' '}
+          <strong>{settings.printMode === 'browser' ? 'Diálogo Navegador' : 'Direto Silencioso (QZ Tray)'}</strong>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
-          <button className="btn btn-primary" onClick={handlePrint}>
-            <Printer size={18} />
-            IMPRIMIR RECIBO
+          <button className="btn btn-primary" onClick={handlePrint} disabled={isPrinting}>
+            {isPrinting ? (
+              <>
+                <Loader2 size={18} className="animate-spin" />
+                Imprimindo...
+              </>
+            ) : (
+              <>
+                <Zap size={18} />
+                IMPRIMIR DIRETO
+              </>
+            )}
           </button>
           {onClose && (
             <button className="btn btn-secondary" onClick={onClose}>

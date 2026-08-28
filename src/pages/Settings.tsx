@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import { Settings as SettingsType } from '../types';
 import { supabaseService } from '../services/supabaseService';
+import { qzPrinterService } from '../services/qzPrinterService';
 import {
   Building2,
   Printer,
@@ -16,7 +17,8 @@ import {
   Upload,
   Camera,
   Loader2,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Zap
 } from 'lucide-react';
 
 export const Settings: React.FC = () => {
@@ -224,11 +226,34 @@ export const Settings: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. CONFIGURAÇÕES DO RECIBO TÉRMICO */}
+      {/* 2. CONFIGURAÇÕES DO RECIBO TÉRMICO E QZ TRAY */}
       <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid var(--border-color)', paddingBottom: 12 }}>
-          <Printer size={22} color="var(--primary)" />
-          <h3 style={{ fontSize: '1.15rem' }}>Recibo Térmico (Impressão)</h3>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: 12, flexWrap: 'wrap', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Printer size={22} color="var(--primary)" />
+            <h3 style={{ fontSize: '1.15rem' }}>Recibo Térmico & Impressão Direta (QZ Tray)</h3>
+          </div>
+
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ fontSize: '0.82rem', padding: '6px 14px' }}
+            onClick={async () => {
+              addToast('info', 'Verificando QZ Tray...', 'Buscando impressoras locais.');
+              const status = await qzPrinterService.getStatus();
+              if (status.connected) {
+                addToast('success', 'QZ Tray Conectado!', `Versão ${status.version}. ${status.printers.length} impressoras encontradas.`);
+                if (status.printers.length > 0 && !form.printerName) {
+                  handleChange('printerName', status.defaultPrinter || status.printers[0]);
+                }
+              } else {
+                addToast('warning', 'QZ Tray não detectado', status.error || 'Certifique-se de que o aplicativo QZ Tray está aberto.');
+              }
+            }}
+          >
+            <Zap size={16} color="var(--primary)" />
+            <span>Testar Conexão QZ Tray</span>
+          </button>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
@@ -253,6 +278,32 @@ export const Settings: React.FC = () => {
               <option value="58mm">58mm (Padrão Pequeno / Portátil)</option>
               <option value="80mm">80mm (Padrão Grande / Balcão)</option>
             </select>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Modo de Emissão</label>
+            <select
+              className="form-select"
+              value={form.printMode || 'qz'}
+              onChange={e => handleChange('printMode', e.target.value as 'qz' | 'browser')}
+            >
+              <option value="qz">⚡ Direto / Silencioso via QZ Tray (Sem Diálogo do Windows)</option>
+              <option value="browser">🖨️ Diálogo Padrão do Navegador (Manual)</option>
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Nome da Impressora Térmica no Windows (Opcional)</label>
+            <input
+              type="text"
+              className="form-input"
+              value={form.printerName || ''}
+              onChange={e => handleChange('printerName', e.target.value)}
+              placeholder="Ex: POS-58, TM-T20, Elgin i9 (ou vazio para padrão)"
+            />
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+              Se deixar em branco, usará automaticamente a impressora padrão do Windows.
+            </span>
           </div>
 
           <div className="form-group" style={{ gridColumn: '1 / -1' }}>

@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { Modal } from '../components/common/Modal';
 import { PaymentMethod, Product, Sale } from '../types';
+import { qzPrinterService } from '../services/qzPrinterService';
 import {
   Search,
   Plus,
@@ -14,7 +15,9 @@ import {
   QrCode as QrCodeIcon,
   Sparkles,
   Layers,
-  LucideIcon
+  LucideIcon,
+  Zap,
+  Loader2
 } from 'lucide-react';
 
 export const Pos: React.FC = () => {
@@ -29,7 +32,8 @@ export const Pos: React.FC = () => {
     cartTotal,
     finalizeCurrentSale,
     setReceiptToPrint,
-    settings
+    settings,
+    addToast
   } = useApp();
 
   const [selectedCategory, setSelectedCategory] = useState<string>('cat_all');
@@ -41,6 +45,7 @@ export const Pos: React.FC = () => {
   const [amountReceived, setAmountReceived] = useState<string>('');
   const [completedSale, setCompletedSale] = useState<Sale | null>(null);
   const [checkoutStep, setCheckoutStep] = useState<'payment' | 'success'>('payment');
+  const [isPrintingSale, setIsPrintingSale] = useState(false);
 
   // Filtragem de produtos ativos
   const filteredProducts = useMemo(() => {
@@ -90,8 +95,28 @@ export const Pos: React.FC = () => {
     setCheckoutStep('payment');
   };
 
-  const handlePrintCompletedSale = () => {
-    if (completedSale) {
+  const handlePrintCompletedSale = async () => {
+    if (!completedSale) return;
+
+    if (settings.printMode === 'browser') {
+      setReceiptToPrint(completedSale);
+      return;
+    }
+
+    setIsPrintingSale(true);
+    addToast('info', 'Enviando cupom...', 'Conectando ao QZ Tray para impressão silenciosa.');
+
+    const result = await qzPrinterService.printReceipt(completedSale, settings);
+    setIsPrintingSale(false);
+
+    if (result.success) {
+      addToast('success', 'Cupom impresso!', 'Venda impressa silenciosamente via QZ Tray.');
+    } else {
+      addToast(
+        'warning',
+        'QZ Tray indisponível',
+        result.error || 'Abrindo diálogo de impressão padrão...'
+      );
       setReceiptToPrint(completedSale);
     }
   };
@@ -471,9 +496,19 @@ export const Pos: React.FC = () => {
               <button
                 className="btn btn-primary btn-lg btn-block"
                 onClick={handlePrintCompletedSale}
+                disabled={isPrintingSale}
               >
-                <Printer size={20} />
-                IMPRIMIR RECIBO
+                {isPrintingSale ? (
+                  <>
+                    <Loader2 size={20} className="animate-spin" />
+                    <span>IMPRIMINDO SILENCIOSO...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap size={20} />
+                    <span>IMPRIMIR RECIBO (DIRETO)</span>
+                  </>
+                )}
               </button>
 
               <button
