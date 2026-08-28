@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { PageId } from '../components/layout/Sidebar';
 import {
@@ -8,7 +8,9 @@ import {
   AlertTriangle,
   TrendingUp,
   Package,
-  ArrowUpRight
+  ArrowUpRight,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -17,6 +19,25 @@ interface DashboardProps {
 
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const { sales, products, activeCashSession, settings } = useApp();
+
+  // Estado para ocultar/mostrar valores sensíveis (com persistência no localStorage)
+  const [hideSensitive, setHideSensitive] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('brisaleve_hide_sensitive') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleHideSensitive = () => {
+    setHideSensitive(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('brisaleve_hide_sensitive', String(next));
+      } catch {}
+      return next;
+    });
+  };
 
   // Cálculo de vendas de hoje usando a data local do dispositivo
   const now = new Date();
@@ -55,11 +76,51 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const maxDaily = Math.max(...last7Days.map(d => d.total), 100);
 
   const formatMoney = (val: number) => {
+    if (hideSensitive) return '••••••';
     return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
 
+  const formatQuantity = (val: number) => {
+    if (hideSensitive) return '••';
+    return val;
+  };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      {/* BARRA SUPERIOR DO DASHBOARD COM BOTÃO OCULTAR/EXIBIR DADOS SENSÍVEIS */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 12
+        }}
+      >
+        <div>
+          <h2 style={{ fontSize: '1.4rem', fontWeight: 800 }}>Visão Geral</h2>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+            Acompanhe o desempenho da sua loja em tempo real
+          </p>
+        </div>
+
+        <button
+          className={`btn ${hideSensitive ? 'btn-secondary' : 'btn-soft'}`}
+          onClick={toggleHideSensitive}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '8px 16px',
+            fontSize: '0.88rem',
+            borderRadius: 'var(--radius-full)'
+          }}
+          title={hideSensitive ? 'Exibir valores do painel' : 'Ocultar valores do painel'}
+        >
+          {hideSensitive ? <EyeOff size={18} color="var(--primary)" /> : <Eye size={18} />}
+          <span>{hideSensitive ? 'Valores Ocultos' : 'Ocultar Valores'}</span>
+        </button>
+      </div>
       {/* 4 CARDS PRINCIPAIS COM INFORMAÇÕES DIRETAS */}
       <div
         style={{
@@ -145,7 +206,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
               Produtos vendidos hoje
             </div>
             <div style={{ fontSize: '1.6rem', fontWeight: 700 }}>
-              {totalProdutosVendidosHoje}{' '}
+              {formatQuantity(totalProdutosVendidosHoje)}{' '}
               <span style={{ fontSize: '0.9rem', fontWeight: 400, color: 'var(--text-light)' }}>unid.</span>
             </div>
           </div>
@@ -182,7 +243,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                 color: produtosEstoqueBaixo.length > 0 ? 'var(--danger-text)' : 'inherit'
               }}
             >
-              {produtosEstoqueBaixo.length}
+              {formatQuantity(produtosEstoqueBaixo.length)}
             </div>
           </div>
         </div>
