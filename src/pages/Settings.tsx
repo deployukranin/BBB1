@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import { Settings as SettingsType } from '../types';
+import { supabaseService } from '../services/supabaseService';
 import {
   Building2,
   Printer,
@@ -11,7 +12,11 @@ import {
   Save,
   CheckCircle2,
   Sun,
-  Moon
+  Moon,
+  Upload,
+  Camera,
+  Loader2,
+  Image as ImageIcon
 } from 'lucide-react';
 
 export const Settings: React.FC = () => {
@@ -20,6 +25,8 @@ export const Settings: React.FC = () => {
 
   const [form, setForm] = useState<SettingsType>({ ...settings });
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   // Sincroniza o formulário sempre que as configurações do Supabase/Contexto carregarem
   useEffect(() => {
@@ -28,6 +35,34 @@ export const Settings: React.FC = () => {
 
   const handleChange = (field: keyof SettingsType, val: any) => {
     setForm(prev => ({ ...prev, [field]: val }));
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      addToast('error', 'Formato inválido', 'Selecione um arquivo de imagem para o logo.');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      addToast('warning', 'Arquivo muito grande', 'A imagem deve ter no máximo 5MB.');
+      return;
+    }
+
+    setIsUploadingLogo(true);
+    addToast('info', 'Enviando logo...', 'Fazendo upload para o Supabase Storage.');
+
+    const res = await supabaseService.uploadImage(file, 'logo');
+    setIsUploadingLogo(false);
+
+    if (res.url) {
+      handleChange('logoUrl', res.url);
+      addToast('success', 'Logo atualizado!', 'Imagem salva no Supabase Storage.');
+    } else {
+      addToast('error', 'Erro no upload', res.error || 'Não foi possível enviar o logo.');
+    }
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -50,6 +85,88 @@ export const Settings: React.FC = () => {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+          {/* Logo da Loja */}
+          <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+            <label className="form-label">Logotipo da Loja</label>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 16,
+                padding: 14,
+                background: 'var(--bg-surface-subtle)',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border-color)'
+              }}
+            >
+              <div
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: 'var(--radius-sm)',
+                  overflow: 'hidden',
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border-color)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}
+              >
+                {form.logoUrl ? (
+                  <img
+                    src={form.logoUrl}
+                    alt="Logo da Loja"
+                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                  />
+                ) : (
+                  <ImageIcon size={26} color="var(--text-light)" />
+                )}
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
+                <input
+                  type="file"
+                  ref={logoInputRef}
+                  onChange={handleLogoUpload}
+                  accept="image/png, image/jpeg, image/webp, image/gif"
+                  style={{ display: 'none' }}
+                />
+
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => logoInputRef.current?.click()}
+                    disabled={isUploadingLogo}
+                    style={{ padding: '8px 16px', fontSize: '0.88rem' }}
+                  >
+                    {isUploadingLogo ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>Enviando Logo...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Camera size={16} />
+                        <span>Carregar Logo do Computador / Celular</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <input
+                  type="url"
+                  className="form-input"
+                  value={form.logoUrl || ''}
+                  onChange={e => handleChange('logoUrl', e.target.value)}
+                  placeholder="Ou cole a URL direta do logotipo..."
+                  style={{ fontSize: '0.82rem', padding: '6px 12px' }}
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="form-group">
             <label className="form-label">Nome da Loja *</label>
             <input

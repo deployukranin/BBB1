@@ -154,3 +154,22 @@ CREATE POLICY "Allow public access to sale_items" ON sale_items FOR ALL USING (t
 
 DROP POLICY IF EXISTS "Allow public access to stock_movements" ON stock_movements;
 CREATE POLICY "Allow public access to stock_movements" ON stock_movements FOR ALL USING (true) WITH CHECK (true);
+
+-- ============================================================
+-- 9. SUPABASE STORAGE (BUCKET 'products' & POLICIES)
+-- ============================================================
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('products', 'products', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DROP POLICY IF EXISTS "Allow public storage select" ON storage.objects;
+CREATE POLICY "Allow public storage select" ON storage.objects FOR SELECT USING (bucket_id = 'products');
+
+DROP POLICY IF EXISTS "Allow public storage insert" ON storage.objects;
+CREATE POLICY "Allow public storage insert" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'products');
+
+DROP POLICY IF EXISTS "Allow public storage update" ON storage.objects;
+CREATE POLICY "Allow public storage update" ON storage.objects FOR UPDATE USING (bucket_id = 'products');
+
+DROP POLICY IF EXISTS "Allow public storage delete" ON storage.objects;
+CREATE POLICY "Allow public storage delete" ON storage.objects FOR DELETE USING (bucket_id = 'products');

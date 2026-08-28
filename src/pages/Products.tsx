@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { Modal } from '../components/common/Modal';
 import { Product } from '../types';
+import { supabaseService } from '../services/supabaseService';
 import {
   Plus,
   Search,
@@ -11,7 +12,10 @@ import {
   CheckCircle2,
   XCircle,
   Eye,
-  EyeOff
+  EyeOff,
+  Upload,
+  Loader2,
+  Camera
 } from 'lucide-react';
 
 const PRESET_IMAGES = [
@@ -26,7 +30,7 @@ const PRESET_IMAGES = [
 ];
 
 export const Products: React.FC = () => {
-  const { products, categories, addProduct, updateProduct, deleteProduct, settings } = useApp();
+  const { products, categories, addProduct, updateProduct, deleteProduct, settings, addToast } = useApp();
 
   const [search, setSearch] = useState('');
   const [selectedCat, setSelectedCat] = useState('cat_all');
@@ -34,6 +38,10 @@ export const Products: React.FC = () => {
   // Modal de Adicionar/Editar
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+
+  // Upload State
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form State
   const [name, setName] = useState('');
@@ -125,6 +133,37 @@ export const Products: React.FC = () => {
     }
 
     setIsFormModalOpen(false);
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Valida se é imagem
+    if (!file.type.startsWith('image/')) {
+      addToast('error', 'Formato inválido', 'Por favor, selecione um arquivo de imagem (PNG, JPG, WEBP).');
+      return;
+    }
+
+    // Valida tamanho max (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      addToast('warning', 'Arquivo muito grande', 'A imagem deve ter no máximo 5MB.');
+      return;
+    }
+
+    setIsUploading(true);
+    addToast('info', 'Enviando imagem...', 'Fazendo upload para o Supabase Storage.');
+
+    const res = await supabaseService.uploadImage(file, 'products');
+
+    setIsUploading(false);
+
+    if (res.url) {
+      setImage(res.url);
+      addToast('success', 'Upload concluído!', 'Foto salva no Supabase Storage com sucesso.');
+    } else {
+      addToast('error', 'Erro no upload', res.error || 'Não foi possível enviar a imagem.');
+    }
   };
 
   const handleConfirmDelete = () => {
@@ -407,15 +446,90 @@ export const Products: React.FC = () => {
               />
             </div>
 
-            <div className="form-group">
-              <label className="form-label">URL da Foto</label>
-              <input
-                type="url"
-                className="form-input"
-                value={image}
-                onChange={e => setImage(e.target.value)}
-                placeholder="https://..."
-              />
+            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+              <label className="form-label">Foto do Produto</label>
+              
+              {/* Card de Upload e Preview */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 16,
+                  padding: 14,
+                  background: 'var(--bg-surface-subtle)',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-color)'
+                }}
+              >
+                {/* Preview da Foto */}
+                <div
+                  style={{
+                    width: 72,
+                    height: 72,
+                    borderRadius: 'var(--radius-sm)',
+                    overflow: 'hidden',
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border-color)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}
+                >
+                  {image ? (
+                    <img
+                      src={image}
+                      alt="Prévia"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      onError={() => {}}
+                    />
+                  ) : (
+                    <ImageIcon size={28} color="var(--text-light)" />
+                  )}
+                </div>
+
+                {/* Botões de Ação de Upload */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    accept="image/png, image/jpeg, image/webp, image/gif"
+                    style={{ display: 'none' }}
+                  />
+
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                      style={{ padding: '8px 16px', fontSize: '0.88rem' }}
+                    >
+                      {isUploading ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          <span>Enviando para o Supabase...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Camera size={16} />
+                          <span>Carregar do Computador / Celular</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <input
+                    type="url"
+                    className="form-input"
+                    value={image}
+                    onChange={e => setImage(e.target.value)}
+                    placeholder="Ou cole a URL direta da imagem..."
+                    style={{ fontSize: '0.82rem', padding: '6px 12px' }}
+                  />
+                </div>
+              </div>
             </div>
           </div>
 

@@ -13,6 +13,37 @@ import { INITIAL_CATEGORIES, INITIAL_PRODUCTS, INITIAL_SETTINGS } from './seedDa
 
 // --- DATA TRANSFORMERS ---
 export const supabaseService = {
+  // 0. STORAGE / UPLOAD
+  async uploadImage(file: File, folder = 'products'): Promise<{ url?: string; error?: string }> {
+    if (!isSupabaseConfigured) {
+      return { error: 'Supabase não configurado.' };
+    }
+    try {
+      const fileExt = file.name.split('.').pop() || 'jpg';
+      const cleanFileName = `${folder}/${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+
+      const { data, error } = await supabase.storage
+        .from('products')
+        .upload(cleanFileName, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      const { data: publicData } = supabase.storage
+        .from('products')
+        .getPublicUrl(cleanFileName);
+
+      return { url: publicData.publicUrl };
+    } catch (err: any) {
+      console.error('Erro no upload para Supabase Storage:', err);
+      return { error: err.message || 'Falha ao enviar imagem para o Supabase.' };
+    }
+  },
+
   // 1. CATEGORIES
   async fetchCategories(): Promise<Category[] | null> {
     if (!isSupabaseConfigured) return null;
