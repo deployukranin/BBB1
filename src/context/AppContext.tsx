@@ -12,6 +12,8 @@ import {
   ToastMessage
 } from '../types';
 import { db } from '../services/db';
+import { supabaseService } from '../services/supabaseService';
+import { storage } from '../services/storage';
 import { useAuth } from './AuthContext';
 import confetti from 'canvas-confetti';
 
@@ -96,6 +98,73 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const removeToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
+
+  // Supabase Initial Sync
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadFromSupabase() {
+      try {
+        const [
+          remoteCats,
+          remoteProds,
+          remoteSettings,
+          remoteSales,
+          remoteSessions,
+          remoteTxs,
+          remoteMovs
+        ] = await Promise.all([
+          supabaseService.fetchCategories(),
+          supabaseService.fetchProducts(),
+          supabaseService.fetchSettings(),
+          supabaseService.fetchSales(),
+          supabaseService.fetchCashSessions(),
+          supabaseService.fetchCashTransactions(),
+          supabaseService.fetchStockMovements()
+        ]);
+
+        if (!isMounted) return;
+
+        if (remoteCats && remoteCats.length > 0) {
+          db.saveCategories(remoteCats);
+          setCategories(remoteCats);
+        }
+        if (remoteProds && remoteProds.length > 0) {
+          db.saveProducts(remoteProds);
+          setProducts(remoteProds);
+        }
+        if (remoteSettings) {
+          storage.set('settings', remoteSettings);
+          setSettingsState(remoteSettings);
+        }
+        if (remoteSales && remoteSales.length > 0) {
+          storage.set('sales', remoteSales);
+          setSales(remoteSales);
+        }
+        if (remoteSessions && remoteSessions.length > 0) {
+          storage.set('cash_sessions', remoteSessions);
+          const active = remoteSessions.find(s => s.status === 'ABERTO') || null;
+          setActiveCashSession(active);
+        }
+        if (remoteTxs && remoteTxs.length > 0) {
+          storage.set('cash_transactions', remoteTxs);
+          setCashTransactions(remoteTxs);
+        }
+        if (remoteMovs && remoteMovs.length > 0) {
+          storage.set('stock_movements', remoteMovs);
+          setStockMovements(remoteMovs);
+        }
+      } catch (e) {
+        console.warn('Initial Supabase sync error:', e);
+      }
+    }
+
+    loadFromSupabase();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // Products CRUD

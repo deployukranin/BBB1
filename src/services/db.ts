@@ -12,6 +12,7 @@ import {
 } from '../types';
 import { INITIAL_CATEGORIES, INITIAL_PRODUCTS, INITIAL_SETTINGS, INITIAL_USER } from './seedData';
 import { storage } from './storage';
+import { supabaseService } from './supabaseService';
 
 export const db = {
   // --- USERS / AUTH ---
@@ -30,6 +31,7 @@ export const db = {
 
   saveSettings(settings: Settings): Settings {
     storage.set('settings', settings);
+    supabaseService.saveSettings(settings);
     return settings;
   },
 
@@ -40,6 +42,21 @@ export const db = {
 
   saveCategories(categories: Category[]): void {
     storage.set('categories', categories);
+  },
+
+  addCategory(category: Category): Category {
+    const categories = this.getCategories();
+    categories.push(category);
+    this.saveCategories(categories);
+    supabaseService.saveCategory(category);
+    return category;
+  },
+
+  deleteCategory(id: string): boolean {
+    const categories = this.getCategories().filter(c => c.id !== id);
+    this.saveCategories(categories);
+    supabaseService.deleteCategory(id);
+    return true;
   },
 
   // --- PRODUCTS ---
@@ -65,6 +82,7 @@ export const db = {
     };
     products.unshift(newProduct);
     this.saveProducts(products);
+    supabaseService.saveProduct(newProduct);
 
     // Registra entrada inicial de estoque se > 0
     if (newProduct.stock > 0) {
@@ -97,12 +115,14 @@ export const db = {
 
     products[index] = updatedProduct;
     this.saveProducts(products);
+    supabaseService.saveProduct(updatedProduct);
     return updatedProduct;
   },
 
   deleteProduct(id: string): boolean {
     const products = this.getProducts().filter(p => p.id !== id);
     this.saveProducts(products);
+    supabaseService.deleteProduct(id);
     return true;
   },
 
@@ -120,6 +140,7 @@ export const db = {
     };
     movements.unshift(newMovement);
     storage.set('stock_movements', movements);
+    supabaseService.saveStockMovement(newMovement);
     return newMovement;
   },
 
@@ -133,6 +154,7 @@ export const db = {
     product.stock = newStock;
     product.updatedAt = new Date().toISOString();
     this.saveProducts(products);
+    supabaseService.saveProduct(product);
 
     const movement = this.recordStockMovement({
       productId: product.id,
@@ -165,6 +187,7 @@ export const db = {
       if (s.status === 'ABERTO') {
         s.status = 'FECHADO';
         s.closedAt = new Date().toISOString();
+        supabaseService.saveCashSession(s);
       }
     });
 
@@ -184,6 +207,7 @@ export const db = {
 
     sessions.unshift(newSession);
     storage.set('cash_sessions', sessions);
+    supabaseService.saveCashSession(newSession);
     return newSession;
   },
 
@@ -205,6 +229,7 @@ export const db = {
     if (notes) session.notes = notes;
 
     storage.set('cash_sessions', sessions);
+    supabaseService.saveCashSession(session);
     return session;
   },
 
@@ -240,6 +265,7 @@ export const db = {
     };
     transactions.unshift(newTx);
     storage.set('cash_transactions', transactions);
+    supabaseService.saveCashTransaction(newTx);
 
     // Atualiza totais da sessão de caixa
     const sessions = this.getCashSessions();
@@ -258,6 +284,7 @@ export const db = {
         currentSession.totalIn -
         currentSession.totalOut;
       storage.set('cash_sessions', sessions);
+      supabaseService.saveCashSession(currentSession);
     }
 
     return newTx;
@@ -323,6 +350,7 @@ export const db = {
       const prev = p.stock;
       p.stock -= item.quantity;
       p.updatedAt = new Date().toISOString();
+      supabaseService.saveProduct(p);
 
       this.recordStockMovement({
         productId: p.id,
@@ -360,6 +388,7 @@ export const db = {
     const sales = this.getSales();
     sales.unshift(newSale);
     storage.set('sales', sales);
+    supabaseService.saveSale(newSale);
 
     // 4. Se houver caixa aberto, registra a entrada no caixa
     if (activeSession) {
