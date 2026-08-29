@@ -127,6 +127,8 @@ export interface Settings {
   printerDensity?: number; // DPI da impressora (ex: 203 DPI para 58mm/80mm)
   printEngine?: 'html' | 'raw'; // Renderização HTML ou Comandos Diretos RAW ESC/POS
   cutPaper?: boolean; // Acionar corte automático do papel
+  codePage?: 'CP850' | 'CP860' | 'UTF-8' | 'ASCII_CLEAN'; // Tabela de caracteres / Code Page
+  removeAccents?: boolean; // Remover acentuação para compatibilidade universal 100% limpa
   printerName?: string;
   printMode?: 'qz' | 'browser';
   lowStockThreshold: number;

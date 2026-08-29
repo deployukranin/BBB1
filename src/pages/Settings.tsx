@@ -338,6 +338,20 @@ export const Settings: React.FC = () => {
           </div>
 
           <div className="form-group">
+            <label className="form-label">Tabela de Caracteres / Acentuação</label>
+            <select
+              className="form-select"
+              value={form.codePage || 'ASCII_CLEAN'}
+              onChange={e => handleChange('codePage', e.target.value as any)}
+            >
+              <option value="ASCII_CLEAN">✅ Sem Acentos / ASCII Limpo (100% Compatível e sem bugs)</option>
+              <option value="CP850">🇧🇷 CP850 (Latin I / Acentos padrão)</option>
+              <option value="CP860">🇵🇹 CP860 (Português)</option>
+              <option value="UTF-8">🌐 UTF-8</option>
+            </select>
+          </div>
+
+          <div className="form-group">
             <label className="form-label">Nome da Impressora no Windows (Opcional)</label>
             <input
               type="text"
@@ -348,7 +362,19 @@ export const Settings: React.FC = () => {
             />
           </div>
 
-          <div className="form-group" style={{ display: 'flex', alignItems: 'center', paddingTop: 24 }}>
+          <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 16 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={form.removeAccents !== false}
+                onChange={e => handleChange('removeAccents', e.target.checked)}
+                style={{ width: 18, height: 18, accentColor: 'var(--primary)' }}
+              />
+              <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>
+                Limpar emojis e símbolos estranhos (Recomendado)
+              </span>
+            </label>
+
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
               <input
                 type="checkbox"
@@ -356,8 +382,8 @@ export const Settings: React.FC = () => {
                 onChange={e => handleChange('cutPaper', e.target.checked)}
                 style={{ width: 18, height: 18, accentColor: 'var(--primary)' }}
               />
-              <span style={{ fontSize: '0.92rem', fontWeight: 600 }}>
-                Acionar guilhotina (Corte automático de papel)
+              <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>
+                Acionar corte automático do papel (Guilhotina)
               </span>
             </label>
           </div>

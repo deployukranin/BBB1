@@ -9,6 +9,23 @@ export interface QzStatus {
   error?: string;
 }
 
+/**
+ * Remove acentos, emojis e caracteres especiais que causam símbolos estranhos em impressoras térmicas
+ */
+export function sanitizeThermalText(text: string, forceAscii = false): string {
+  if (!text) return '';
+
+  // Remove emojis comuns (como 💕, 🌸, etc.) que não existem no conjunto de caracteres das impressoras térmicas
+  let clean = text.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
+
+  if (forceAscii) {
+    // Converte caracteres acentuados (ç, ã, é, í, etc.) para os equivalentes ASCII puros (c, a, e, i)
+    clean = clean.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+
+  return clean;
+}
+
 class QZPrinterService {
   private isConnected = false;
   private connectionPromise: Promise<boolean> | null = null;
@@ -123,18 +140,24 @@ class QZPrinterService {
   }
 
   /**
-   * Gera comandos RAW ESC/POS diretos (100% nativo para impressoras térmicas 58mm/80mm)
-   * Elimina completamente o desperdício de papel e problemas de renderização gráfica.
+   * Gera comandos RAW ESC/POS diretos sem caracteres bugados
    */
   generateEscPosCommands(sale: Sale, settings: Settings): string[] {
     const is80mm = settings.printerWidth === '80mm';
-    const lineWidth = is80mm ? 48 : 32; // 32 caracteres por linha para 58mm, 48 para 80mm
+    const lineWidth = is80mm ? 48 : 32; // 32 colunas para 58mm, 48 para 80mm
     const saleDate = new Date(sale.createdAt);
 
+    // Se o usuário marcou para remover acentos ou se codePage for ASCII_CLEAN
+    const forceAscii = settings.removeAccents !== false || settings.codePage === 'ASCII_CLEAN';
+
+    const clean = (t: string) => sanitizeThermalText(t, forceAscii);
+
     const padRow = (left: string, right: string) => {
-      const space = lineWidth - left.length - right.length;
-      if (space <= 0) return left + ' ' + right;
-      return left + ' '.repeat(space) + right;
+      const cleanLeft = clean(left);
+      const cleanRight = clean(right);
+      const space = lineWidth - cleanLeft.length - cleanRight.length;
+      if (space <= 0) return cleanLeft + ' ' + cleanRight;
+      return cleanLeft + ' '.repeat(space) + cleanRight;
     };
 
     const formatMoney = (val: number) =>
@@ -150,20 +173,25 @@ class QZPrinterService {
     const ALIGN_LEFT = ESC + 'a' + '\x00';
     const BOLD_ON = ESC + 'E' + '\x01';
     const BOLD_OFF = ESC + 'E' + '\x00';
-    const DOUBLE_SIZE_ON = ESC + '!' + '\x30'; // Double height + double width
-    const DOUBLE_SIZE_OFF = ESC + '!' + '\x00';
     const CUT = GS + 'V' + '\x41' + '\x03'; // Feed and partial cut
+
+    // Seleção de Code Page na impressora
+    // ESC t 2 = CP850 (Multilingual Latin I), ESC t 3 = CP860 (Português), ESC t 0 = CP437 (USA)
+    const CODE_PAGE_CMD = ESC + 't' + (settings.codePage === 'CP860' ? '\x03' : '\x02');
 
     const lines: string[] = [];
 
-    // Inicializa
+    // Inicializa impressora e CodePage
     lines.push(INIT);
+    if (!forceAscii) {
+      lines.push(CODE_PAGE_CMD);
+    }
 
     // Cabeçalho
     lines.push(ALIGN_CENTER);
-    lines.push(BOLD_ON + (settings.receiptHeader || settings.companyName || 'BRISA LEVE') + BOLD_OFF + '\n');
-    if (settings.address) lines.push(settings.address + '\n');
-    if (settings.phone) lines.push('Tel: ' + settings.phone + '\n');
+    lines.push(BOLD_ON + clean(settings.receiptHeader || settings.companyName || 'BRISA LEVE') + BOLD_OFF + '\n');
+    if (settings.address) lines.push(clean(settings.address) + '\n');
+    if (settings.phone) lines.push('Tel: ' + clean(settings.phone) + '\n');
 
     lines.push(ALIGN_LEFT);
     lines.push(divider + '\n');
@@ -187,7 +215,7 @@ class QZPrinterService {
 
     // Itens
     sale.items.forEach(it => {
-      lines.push(it.productName.substring(0, lineWidth) + '\n');
+      lines.push(clean(it.productName).substring(0, lineWidth) + '\n');
       lines.push(
         padRow(
           `  ${it.quantity} un x ${formatMoney(it.unitPrice)}`,
@@ -219,9 +247,9 @@ class QZPrinterService {
 
     // Rodapé
     lines.push(ALIGN_CENTER);
-    lines.push((settings.receiptFooter || 'Obrigada pela preferencia!') + '\n\n\n');
+    lines.push(clean(settings.receiptFooter || 'Obrigada pela preferencia!') + '\n\n\n');
 
-    // Cortar papel (se configurado ou por padrão)
+    // Cortar papel
     if (settings.cutPaper !== false) {
       lines.push(CUT);
     }
@@ -241,11 +269,13 @@ class QZPrinterService {
     const formatMoney = (val: number) =>
       val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+    const clean = (t: string) => sanitizeThermalText(t, false);
+
     const itemsHtml = sale.items
       .map(
         it => `
         <div style="margin-bottom: 2px;">
-          <div style="font-weight: bold; word-break: break-word;">${it.productName}</div>
+          <div style="font-weight: bold; word-break: break-word;">${clean(it.productName)}</div>
           <div style="display: flex; justify-content: space-between; font-size: 0.9em; color: #222;">
             <span>${it.quantity} un x ${formatMoney(it.unitPrice)}</span>
             <span>${formatMoney(it.subtotal)}</span>
@@ -288,10 +318,10 @@ class QZPrinterService {
       </head>
       <body>
         <div class="center bold" style="font-size: 1.15em; margin-bottom: 2px;">
-          ${settings.receiptHeader || settings.companyName || 'BRISA LEVE'}
+          ${clean(settings.receiptHeader || settings.companyName || 'BRISA LEVE')}
         </div>
-        ${settings.address ? `<div class="center" style="font-size: 0.8em;">${settings.address}</div>` : ''}
-        ${settings.phone ? `<div class="center" style="font-size: 0.8em; margin-bottom: 2px;">Tel: ${settings.phone}</div>` : ''}
+        ${settings.address ? `<div class="center" style="font-size: 0.8em;">${clean(settings.address)}</div>` : ''}
+        ${settings.phone ? `<div class="center" style="font-size: 0.8em; margin-bottom: 2px;">Tel: ${clean(settings.phone)}</div>` : ''}
 
         <div class="divider"></div>
 
@@ -301,7 +331,7 @@ class QZPrinterService {
         </div>
         <div class="row">
           <span>HORA: ${saleDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
-          <span>OP: ${sale.userName || 'Brisa'}</span>
+          <span>OP: ${clean(sale.userName || 'Brisa')}</span>
         </div>
 
         <div class="divider"></div>
@@ -360,7 +390,7 @@ class QZPrinterService {
         <div class="divider"></div>
 
         <div class="center" style="margin-top: 4px; font-style: italic;">
-          ${settings.receiptFooter || 'Obrigada pela preferência 💕'}
+          ${clean(settings.receiptFooter || 'Obrigada pela preferência!')}
         </div>
       </body>
       </html>
@@ -393,19 +423,23 @@ class QZPrinterService {
         };
       }
 
-      const engine = settings.printEngine || 'raw'; // Padrão RAW ESC/POS para térmicas (não gera página A4/gigante)
+      const engine = settings.printEngine || 'raw';
 
       if (engine === 'raw') {
-        // MODO RAW ESC/POS (Comandos diretos para a bobina da impressora)
+        // MODO RAW ESC/POS
         const escPosData = this.generateEscPosCommands(sale, settings);
+        
+        // Encoding configurável para compatibilidade com chip da impressora
+        const encoding = settings.codePage === 'CP860' ? 'CP860' : (settings.codePage === 'CP850' ? 'CP850' : 'UTF-8');
+
         const config = qz.configs.create(printer, {
-          encoding: 'CP860' // Suporta acentuação em português
+          encoding: encoding
         });
 
         await qz.print(config, escPosData);
         return { success: true };
       } else {
-        // MODO PIXEL / HTML (com largura e densidade restritas)
+        // MODO PIXEL / HTML
         const html = this.generateReceiptHtml(sale, settings);
         const is80mm = settings.printerWidth === '80mm';
         const widthMm = settings.customWidthMm || (is80mm ? 72 : 48);
@@ -413,8 +447,8 @@ class QZPrinterService {
         const config = qz.configs.create(printer, {
           margins: { top: 0, right: 0, bottom: 0, left: 0 },
           units: 'mm',
-          size: { width: widthMm }, // Trava a largura da bobina térmica
-          density: settings.printerDensity || 203, // DPI térmico padrão
+          size: { width: widthMm },
+          density: settings.printerDensity || 203,
           colorType: 'blackwhite',
           scaleContent: true,
           rasterize: true
