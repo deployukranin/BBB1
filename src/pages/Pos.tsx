@@ -76,10 +76,31 @@ export const Pos: React.FC = () => {
     setIsCheckoutOpen(true);
   };
 
-  const handleConfirmSale = () => {
+  const handleSelectPaymentAndFinish = (paymentMethod: PaymentMethod) => {
+    setSelectedPayment(paymentMethod);
+
+    // Se for DINHEIRO, mantém aberto para conferência de valor recebido e troco
+    if (paymentMethod === 'DINHEIRO') {
+      return;
+    }
+
+    // Para PIX, CARTÃO DÉBITO, CARTÃO CRÉDITO e OUTRO: Finaliza instantaneamente
     const result = finalizeCurrentSale({
-      paymentMethod: selectedPayment,
-      amountReceived: selectedPayment === 'DINHEIRO' ? (numReceived > 0 ? numReceived : cartTotal) : cartTotal,
+      paymentMethod,
+      amountReceived: cartTotal,
+      change: 0
+    });
+
+    if (result.success && result.sale) {
+      setCompletedSale(result.sale);
+      setCheckoutStep('success');
+    }
+  };
+
+  const handleConfirmCashSale = () => {
+    const result = finalizeCurrentSale({
+      paymentMethod: 'DINHEIRO',
+      amountReceived: numReceived > 0 ? numReceived : cartTotal,
       change: changeValue
     });
 
@@ -353,7 +374,7 @@ export const Pos: React.FC = () => {
             {/* Seleção da Forma de Pagamento */}
             <div style={{ marginBottom: 20 }}>
               <label className="form-label" style={{ marginBottom: 10, display: 'block' }}>
-                Selecione a forma de pagamento:
+                Clique no meio de pagamento para concluir a venda:
               </label>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10 }}>
                 {paymentOptions.map(opt => {
@@ -363,18 +384,22 @@ export const Pos: React.FC = () => {
                     <button
                       key={opt.id}
                       type="button"
-                      onClick={() => setSelectedPayment(opt.id)}
+                      onClick={() => handleSelectPaymentAndFinish(opt.id)}
                       className={`btn ${isSelected ? 'btn-primary' : 'btn-secondary'}`}
                       style={{
-                        padding: '14px 10px',
+                        padding: '16px 10px',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: 6,
-                        height: 'auto'
+                        gap: 8,
+                        height: 'auto',
+                        border: isSelected ? '2px solid var(--primary)' : undefined
                       }}
                     >
-                      <Icon size={22} />
-                      <span style={{ fontSize: '0.85rem' }}>{opt.label}</span>
+                      <Icon size={24} />
+                      <span style={{ fontSize: '0.9rem', fontWeight: 700 }}>{opt.label}</span>
+                      {opt.id !== 'DINHEIRO' && (
+                        <span style={{ fontSize: '0.72rem', opacity: 0.8 }}>⚡ Concluir</span>
+                      )}
                     </button>
                   );
                 })}
@@ -442,7 +467,8 @@ export const Pos: React.FC = () => {
                     alignItems: 'center',
                     padding: '10px 14px',
                     borderRadius: 'var(--radius-sm)',
-                    background: changeValue > 0 ? 'var(--warning-bg)' : 'transparent'
+                    background: changeValue > 0 ? 'var(--warning-bg)' : 'transparent',
+                    marginBottom: 16
                   }}
                 >
                   <span style={{ fontWeight: 600 }}>Troco a Devolver:</span>
@@ -456,16 +482,16 @@ export const Pos: React.FC = () => {
                     {formatMoney(changeValue)}
                   </span>
                 </div>
+
+                {/* Botão de Confirmação para Dinheiro */}
+                <button
+                  className="btn btn-primary btn-xl btn-block"
+                  onClick={handleConfirmCashSale}
+                >
+                  CONFIRMAR VENDA EM DINHEIRO
+                </button>
               </div>
             )}
-
-            {/* Botão de Confirmação */}
-            <button
-              className="btn btn-primary btn-xl btn-block"
-              onClick={handleConfirmSale}
-            >
-              CONFIRMAR VENDA
-            </button>
           </div>
         ) : (
           /* TELA DE SUCESSO APÓS A VENDA */
